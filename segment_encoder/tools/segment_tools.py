@@ -448,3 +448,5 @@ def _get_rotation_matrix_z(theta):
 segment_pcl_list_scaler = StandardScaler()
 
 # todo during augmentation we process segments and classes, ids should be processed as well
+if __name__ == '__main__':
+    print('segment_tools done!')
