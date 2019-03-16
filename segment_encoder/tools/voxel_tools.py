@@ -112,3 +112,5 @@ class TrainScaler(BaseEstimator, TransformerMixin):
         return aligned_segments
 
 
+if __name__ == '__main__':
+    print('voxel_tools done!')
