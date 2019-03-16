@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/anastasia/segmap_machine_learning_project-master/tmp1/model.ckpt"
+all_model_checkpoint_paths: "/home/anastasia/segmap_machine_learning_project-master/tmp1/model.ckpt"

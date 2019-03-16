@@ -1,0 +1,2 @@
+model_checkpoint_path: "C:/Users/kichk/Downloads/segmap_machine_learning_project-master/segmap64/model.ckpt"
+all_model_checkpoint_paths: "C:/Users/kichk/Downloads/segmap_machine_learning_project-master/segmap64/model.ckpt"
