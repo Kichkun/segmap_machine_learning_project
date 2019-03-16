@@ -112,3 +112,5 @@ def plot_segment_voxelboxes(voxelboxes):
 
         plt.show()
 
+if __name__ == '__main__':
+    print('plot_tools done!')
