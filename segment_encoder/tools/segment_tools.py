@@ -7,47 +7,160 @@ import os
 
 TEMP_DIR = r'../temp'
 
-def shift_pcl(pcl, dims, cval=50):
-    raise NotImplementedError
-    return
+# todo idea create scaler
+# todo idea iterate over segments list
+# todo idea partial_fit
+# todo idea dump scaler
+# todo idea iterate over segments list
+# todo idea finally fit_transform()
 
-class PclShifter(BaseEstimator, TransformerMixin):
+class LogScaler(BaseEstimator, TransformerMixin):
+    '''
+    Applies logarithm the points (neg_vals stay neg, but log_scaled) abs(log(x-1))
 
-    # commonly used idea for images, could be used for pcls as well
-    # augment data with basic shift of pcl should improve performance
-    # todo implement later
-    def __init__(self, dx=0, dy=0, new_vals=50):
-        self.dx = dx
-        self.dy = dy
-        self.new = new_vals
-        self.shifted = None
+    Parameters
+    ----------
+    base : float, default 2
+        base of the logarithm.
 
-    def shift_pcl_(self, pcl_array, dx, dy, dz, new):
-        # pcl_array = array[n_points, n_dims]
-        # segments = array[n_segments, n_points, n_dims]
+    sensitivity : float,  default 0.1
+        upper bound percent of points to remove.
+    '''
 
-        xs = np.random.uniform(low=1, high=5, size=100)
-        ys = np.random.uniform(low=-10, high=-12, size=100)
-        zs = np.random.uniform(low=-0.007, high=-0.9, size=100)
+    def __init__(self, base=2, sensitivity=1.0e-10):
 
-        pcl_array = np.concatenate((xs, ys, zs)).T
+        available_types = [np.int, np.int0, np.int8, np.int16, np.int32, np.int64, \
+                           np.float, np.float16, np.float32, np.float64, \
+                           int, float]
 
+        assert type(base) in available_types, 'base type is: {}\n not among: {}'.format(type(base), available_types)
+        assert sensitivity > 0, 'positive value accepted only'
+
+        self.base = base
+        self.sens = sensitivity
         raise NotImplementedError
-        assert pcl_array.shape[0] == 3 # x y z
-
-        return shift_pcl(pcl_array.reshape(28, 28), [dy, dx, dy], cval=new).reshape(784)
-
-    def shift_pcls_(self, pcl_matrix, dx, dy, dz):
-        return np.array([self.shift_pcl_(pcl_array, dx, dy, dz, 50) \
-                         for pcl_array in pcl_matrix])
 
     def fit(self, X, y=None):
-        self.shifted = self.shift_pcls_(X, self.dx, self.dy)
-        return self  # create
+
+        '''LogFeatures fitting'''
+
+        return self
 
     def transform(self, X):
-        '''X: numerical matrix'''
-        return np.concatenate((X, self.shifted), axis = 0)
+
+        '''LogFeatures transforming'''
+
+        assert type(X) == np.ndarray
+
+        # aviod log(zero) problem
+        X[(0 <= X) & (X < self.sens)] = self.sens  # small pos
+        X[(-self.sens < X) & (X <= 0)] = -self.sens  # small neg
+
+        # log neg vals too
+        neg_mask = X < 0
+        try:
+            X_log = np.log(np.abs(X)) / np.log(self.base)
+        except ValueError:
+            print("LogScaler Failed skipping...")
+            return X
+
+        X_log[neg_mask] = - X_log[neg_mask]
+
+        return X_log
+        # return np.concatenate((X, X_log), axis=1)
+
+
+class ListScaler(BaseEstimator, TransformerMixin):
+    '''
+    Given a list of pointclouds, applies a given scaler partially, then transforms partially
+
+    Parameters
+    ----------
+    scaler : float, default 2
+        base of the logarithm.
+
+    '''
+
+    def __init__(self, scaler="standart"):
+
+        assert scaler in ["standart", "normal", "min_max", "max_abs", "robust", "log"]
+        assert scaler != 'log', NotImplementedError
+
+        if scaler == "standart":
+            from sklearn.preprocessing import StandardScaler
+            self.scaler = StandardScaler()
+
+        elif scaler == 'normal':
+            from sklearn.preprocessing import Normalizer
+            self.scaler = Normalizer()
+
+        elif scaler == 'min_max':
+            from sklearn.preprocessing import MinMaxScaler
+            self.scaler = MinMaxScaler()
+
+        elif scaler == 'max_abs':
+            from sklearn.preprocessing import MaxAbsScaler
+            self.scaler = MaxAbsScaler()
+
+        elif scaler == 'robust':
+            from sklearn.preprocessing import RobustScaler
+            self.scaler = RobustScaler()
+
+    def fit(self, X, y=None):
+
+        '''Scaler partial fitting'''
+
+        segments = X
+        for segment in segments:
+            self.scaler.partial_fit(segment)
+
+        # in case of batch learning, scaler should be fit to the whole dataset
+        with open(os.path.join(TEMP_DIR, 'total_scaler.csv'), "wb") as f:  # Pickling
+            pickle.dump(self.scaler, f)
+
+        return self
+
+    def partial_train(self, X):
+
+        '''in case of batch learning, scaler should be fitted to the whole dataset'''
+
+        segments = X
+
+        # load total_scaler
+        with open(os.path.join(TEMP_DIR, 'total_scaler.csv'), "rb") as f:  # Unpickling
+            total_scaler = pickle.load(f)
+        # fit
+        for segment in segments:
+            total_scaler.partial_fit(segment)
+        # save
+        with open(os.path.join(TEMP_DIR, 'total_scaler.csv'), "wb") as f:  # Pickling
+            pickle.dump(total_scaler, f)
+
+    def transform(self, X):
+
+        '''ListScaler transforming'''
+
+        segments = X
+        new_segments = []
+        for segment in segments:
+            new_segments.append(self.scaler.transform(segment))
+        return self
+
+    def total_transform(self, X):
+
+        '''ListScaler transforming'''
+
+        segments = X
+
+        # load
+        with open(os.path.join(TEMP_DIR, 'total_scaler.csv'), "rb") as f:  # Unpickling
+            total_scaler = pickle.load(f)
+        # transform
+        new_segments = []
+        for segment in segments:
+            new_segments.append(total_scaler.transform(segment))
+        return self
+
 
 class RandomRemover(BaseEstimator, TransformerMixin):
     """
@@ -72,6 +185,9 @@ class RandomRemover(BaseEstimator, TransformerMixin):
         return self  # create
 
     def transform(self, X:list):
+
+        '''ListScaler transforming'''
+
         segments = X
         augmented_segments = []
         for segment in segments:
@@ -118,6 +234,9 @@ class PlaneRemover(BaseEstimator, TransformerMixin):
         return self  # create
 
     def transform(self, X:list):
+
+        '''ListScaler transforming'''
+
         segments = X
         augmented_segments = []
         for segment in segments:
@@ -178,7 +297,9 @@ class Aligner(BaseEstimator, TransformerMixin):
         return self  # create
 
     def transform(self, X:list):
-        '''X: list'''
+
+        '''ListScaler transforming'''
+
         segments = X
         aligned_segments = []
         if self.method == 'eigen':
@@ -252,7 +373,6 @@ class EigenAligner(BaseEstimator, TransformerMixin):
         return self  # create
 
     def transform(self, X:list):
-        '''X: list'''
         segments = X
         aligned_segments = []
         for segment in segments:
@@ -341,7 +461,7 @@ class CoordinatesRescaler(BaseEstimator, TransformerMixin):
     # scale same as in PlaneRemover
     # todo Why not MinMaxScaler of sklearn ?
 
-    def __init__(self, scale_method = "fixed",
+    def __init__(self, scale_method = "fit",
                  center_method = "mean",
                  scale = np.array((8,8,4)),
                  voxel_shape = np.array((32, 32, 16)),
