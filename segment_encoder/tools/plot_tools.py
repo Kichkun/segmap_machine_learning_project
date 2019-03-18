@@ -3,54 +3,30 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
 
-def plot_segment_pcl(segment, extra_info=None, segment_id=None):
-    fig = plt.figure(1, figsize=(12, 6))
-    plt.clf()
+def plot_segment_pcl(segment, extra_info=None, segment_id=0):
 
+    # scale the axes to match for all the segments
+    axes_min = np.array(np.min(segment, axis=0))
+    axes_max = np.array(np.max(segment, axis=0))
+
+    fig = plt.figure(segment_id, figsize=(12, 6))
+    plt.clf()
     ax = fig.add_subplot(111, projection="3d")
 
-    segment = segment - np.min(segment, axis=0)
-
-    # Maintain aspect ratio on xy scale
-    ax.set_xlim(0, np.max(segment[:, :]))
-    ax.set_ylim(0, np.max(segment[:, :]))
-    ax.set_zlim(0, np.max(segment[:, :]/1.5))
+    ax.set_xlim(axes_min[0], axes_max[0])
+    ax.set_ylim(axes_min[1], axes_max[1])
+    ax.set_zlim(axes_min[2], axes_max[2])
 
     x, y, z = np.hsplit(segment, segment.shape[1])
     ax.scatter(x, y, z, c=list(((z - min(z)) / max(z)).reshape(-1, )), s=5)
 
-    extra_info = "Segment {} {}".format(segment_id, extra_info)
-    sys.stdout.write(extra_info)
-    plt.draw()
+    # fig.canvas.flush_events()
+    plt.show()
 
 
-def plot_segments_pcl(segments, extra_info=None, no_ticks=False):
-
-    # scale the axes to match for all the segments
-    axes_min = np.array(np.min(segments[0], axis=0))
-    axes_max = np.array(np.max(segments[0], axis=0))
-
-    for seg in segments[1:]:
-        axes_min = np.minimum(axes_min, np.min(seg, axis=0))
-        axes_max = np.maximum(axes_max, np.max(seg, axis=0))
-
-    # display segments
+def plot_segments_pcl(segments, extra_info=None):
     for i, segment in enumerate(segments):
-
-        fig = plt.figure(i, figsize=(12, 6))
-        plt.clf()
-        ax = fig.add_subplot(111, projection="3d")
-
-        ax.set_xlim(axes_min[0], axes_max[0])
-        ax.set_ylim(axes_min[1], axes_max[1])
-        ax.set_zlim(axes_min[2], axes_max[2])
-
-        x, y, z = np.hsplit(segment, segment.shape[1])
-        ax.scatter(x, y, z, c=list(((z - min(z)) / max(z)).reshape(-1, )), s=5)
-
-        # fig.canvas.flush_events()
-        plt.show()
-
+        plot_segment_pcl(segment, extra_info=extra_info, segment_id=i)
     plt.ioff()
     plt.close("all")
 
