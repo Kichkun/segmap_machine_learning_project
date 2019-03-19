@@ -12,7 +12,7 @@ import os
 # from classifiertools import get_default_preprocessor
 # from preprocessor import Preprocessor
 
-from segment_encoder.core.generator import EncoderGenerator
+from segment_encoder.core.generator import EncoderGenerator, EncoderSemanticsGenerator
 import tensorflow as tf
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
@@ -33,6 +33,7 @@ from segment_encoder.tools.plot_tools import plot_segment_voxelbox
 # importing manually ==========================================================================
 from tensorflow import keras
 # reduce_mean = tf.keras.backend.mean
+Activation = tf.keras.layers.Activation
 reduce_mean = tf.reduce_mean
 layers = tf.keras.layers
 Concatenate = tf.keras.layers.Concatenate
@@ -52,12 +53,19 @@ Input, Dense, Conv3D, MaxPooling3D, UpSampling3D, Dropout, Flatten, Reshape = tf
 																			tf.keras.layers.Reshape
 
 # define data paths ==========================================================================
+
+
+# DATASET_PATH = './datasets_npy/'
+# LABELS_PATH = './dataset'+str(DATASET)+'/labels_database.csv'
+
+# labels_database27_3_classes
 DATASET = 18
 DATASET_PATH = './datasets_npy/'
 LABELS_PATH = './dataset'+str(DATASET)+'/labels_database.csv'
+N_CLASSES = 3
 VOXEL_SHAPE = np.array((32, 32, 16))
-BATCH_SIZE = 64
-EPOCHS = 50
+BATCH_SIZE = 16
+EPOCHS = 1
 log_dir = "./logs_keras_tb"
 
 # labels_database27_3_classes
@@ -117,43 +125,34 @@ labels_dict = dict(zip(range(len(segments)), labels))
 # print(labels_dict)
 
 n_classes=np.unique(ids).size
-
-training_generator=EncoderGenerator(nums=partition['train'],
+training_generator=EncoderSemanticsGenerator(nums=partition['train'],
 						  segments=segments,
 						  ids=ids,
 						  pipeline=preprocessing_pipeline,
 						  batch_size=BATCH_SIZE, # BATCH_SIZE
-						  n_classes=n_classes)
+						  n_classes=N_CLASSES,
+                          labels=labels)
 
-test_generator=EncoderGenerator(nums=partition['test'],
+
+test_generator=EncoderSemanticsGenerator(nums=partition['test'],
 						  segments=segments,
 						  ids=ids,
 						  pipeline=preprocessing_pipeline,
 						  batch_size=BATCH_SIZE, # BATCH_SIZE
-						  n_classes=n_classes)
+						  n_classes=N_CLASSES,
+                          labels=labels)
 
 
 #==========================================================================================
 # NeuralNet ============================================================================
 
-class LossHistory(keras.callbacks.Callback):
-  def on_train_begin(self, logs={}):
-    self.losses = []
-    self.val_losses = []
-
-  def on_batch_end(self, batch, logs={}):
-    self.losses.append(logs.get('loss'))
-    self.val_losses.append(logs.get('val_loss'))
-
-
-loss_history = LossHistory()
-
 input_voxel = Input(shape=(32, 32, 16, 1))
 scales = Input(shape=(1, 3))
 
+# Convolution
 x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(input_voxel)
 x = MaxPooling3D((2, 2, 2), padding='same')(x)
-x = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(x)
+x = Conv3D(64, (3, 3 ,3), activation='relu', padding='same')(x)
 x = MaxPooling3D((2, 2, 2), padding='same')(x)
 x = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(x)
 
@@ -161,36 +160,51 @@ x = Flatten()(x)
 x = Reshape((1, 16384))(x)
 x = Concatenate()([x, scales])
 
+
 x = Dense(512)(x)
 x = BatchNormalization()(x)
 x = Dropout(0.5)(x)
-encoded = Dense(64)(x)
 
-x = Dense(8192)(encoded)
+# Descriptor
+description = Dense(64)(x)
+
+# Deconvolution
+x = Dense(8192)(description)
 x = Reshape((8, 8, 4, 32))(x)
 x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
 x = UpSampling3D((2, 2, 2))(x)
 x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
 x = UpSampling3D((2, 2, 2))(x)
-print(x.shape)
-decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding='same')(x)
-print(decoded.shape)
+reconstructed = Conv3D(1, (3, 3, 3), activation='sigmoid', padding='same', name='reconstruction_output')(x)
+
+#Classificator
+y = BatchNormalization()(description)
+y = Dropout(0.5)(y)
+y = Dense(N_CLASSES)(y)
+classified = Activation('softmax', name='classification_output')(y)
+
+def reconstruction_loss(voxels, reconstructed):
+    FN_TO_FP_WEIGHT = 0.9
+    loss_r = - tf.reduce_mean(FN_TO_FP_WEIGHT * voxels * keras.backend.log(reconstructed + 1e-10) + (1 - FN_TO_FP_WEIGHT) * \
+                            (1 - voxels) * keras.backend.log(1 - reconstructed + 1e-10))
+    return loss_r
+
+def classification_loss(classes, classified):
+    loss_c = -tf.reduce_mean(keras.losses.binary_crossentropy(classes, classified))
+    return loss_c
+
+losses = {
+	"reconstruction_output": reconstruction_loss,
+	"classification_output": classification_loss
+}
+loss_weights = {"reconstruction_output": 200, "classification_output": 1}
+
+autoencoder = Model(inputs=[input_voxel, scales], outputs=[reconstructed, classified])
+autoencoder.compile(optimizer='adadelta', loss=losses, loss_weights=loss_weights)
 
 e_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience = 5)
 
 
-def custom_loss(y_true, y_pred):
-  FN_TO_FP_WEIGHT = 0.9
-  loss_r = - reduce_mean(
-    FN_TO_FP_WEIGHT * y_true * keras.backend.log(y_pred + 1e-10) + (1 - FN_TO_FP_WEIGHT) * \
-    (1 - y_true) * keras.backend.log(1 - y_pred + 1e-10))
-
-  loss = loss_r # LOSS_C_WEIGHT * loss_c + LOSS_R_WEIGHT * loss_r
-  return loss
-
-
-autoencoder = Model([input_voxel, scales], decoded)
-autoencoder.compile(optimizer='adadelta', loss=custom_loss)
 # NeuralNet ============================================================================
 #==========================================================================================
 
@@ -200,12 +214,17 @@ autoencoder.compile(optimizer='adadelta', loss=custom_loss)
 # inputs, y = training_generator.__getitem__(index=0)
 # voxelbox_segments_batch, last_scales_batch = inputs
 
-history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=100, callbacks=[e_stopping, loss_history])
+history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=100, callbacks=[e_stopping])
 
+# Kostya check
+# history = autoencoder.fit(x=[np.zeros((1, 32, 32, 16, 1)), np.zeros((1, 1, 3))],
+#                           y=[np.zeros((1, 32, 32, 16, 1)), np.zeros((1, 1, 4))],
+#                           epochs=50, batch_size=1)
 
 # history = autoencoder.fit([voxelbox_segments_batch, last_scales_batch], y, epochs=EPOCHS, batch_size=1)
 
-autoencoder.save(log_dir+"./model_data"+str(DATASET)+"_epochs50.h5")
+# autoencoder.save("./model_data27_epochs50.h5")
+autoencoder.save(log_dir+"/model_data"+str(DATASET)+"_epochs50.h5")
 
 # decoded = autoencoder.predict(x=[voxelbox_segments_batch, last_scales_batch])
 	# autoencoder.layers.index(len(autoencoder.layers)-1)
