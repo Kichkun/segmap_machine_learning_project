@@ -57,23 +57,15 @@ class BaseGenerator(tf.keras.utils.Sequence):
 
         '''Denotes the number of batches per epoch'''
 
-        return int(self.ids.size // self.batch_size)
+        return int(self.nums.size // self.batch_size)
 
     def __getitem__(self, index):
 
         '''Generate one batch of data'''
 
-        # Generate indexes of the batch
-        indexes = self.indexes[index*self.batch_size : (index+1)*self.batch_size]
+        raise NotImplementedError
 
-        # Find list of IDs
-        nums_temp=self.nums[indexes] # to change
-
-        # Generate data
-        X, y = self.__data_generation(nums_temp)
-
-        # return X.reshape(X.shape[0],X.shape[1],X.shape[2],X.shape[3],1), y, self.last_scales
-        return X, y, self.last_scales
+        return
 
     def on_epoch_end(self):
 
@@ -87,17 +79,9 @@ class BaseGenerator(tf.keras.utils.Sequence):
 
         '''Generates data containing batch_size samples'''
 
-        # Initialization
-        assert type(self.segments) == np.ndarray
-        X = self.segments[nums_temp]
-        self._get_last_scales(X)
-        y = self.ids[nums_temp]
+        raise NotImplementedError
 
-        # Generate data
-        X = self.pipeline.fit_transform(X)
-
-        # output batch with onehot labels
-        return X, tf.keras.utils.to_categorical(y, num_classes=self.n_classes)
+        return
 
     def _get_last_scales(self, segments):
 
@@ -131,7 +115,8 @@ class BaseGenerator(tf.keras.utils.Sequence):
 
 class EncoderGenerator(BaseGenerator):
 
-    '''No y'''
+    '''Generator for model with "only" encode decode layers
+    outputs [X, self.last_scales], X'''
 
     def __getitem__(self, index):
 
@@ -147,8 +132,8 @@ class EncoderGenerator(BaseGenerator):
         X = self.__data_generation(nums_temp)
         self.last_scales = np.array(self.last_scales)
         self.last_scales = self.last_scales.reshape(self.last_scales.shape[0], 1, 3)
-        # return X.reshape(X.shape[0],X.shape[1],X.shape[2],X.shape[3],1), y, self.last_scales
         X = X.reshape((X.shape[0],X.shape[1],X.shape[2],X.shape[3], 1))
+
         return [X, self.last_scales], X
 
     def __data_generation(self, nums_temp):
@@ -169,7 +154,26 @@ class EncoderGenerator(BaseGenerator):
 
 class SemanticsGenerator(BaseGenerator):
 
-    '''No y'''
+    '''Generator for model with "freezed" encode decode layers and classification layers
+    outputs [X, self.last_scales], y'''
+
+    def __init__(self, nums, segments, ids, pipeline, batch_size=32,
+                 n_classes=3, shuffle=True, scale_method='fit', labels=None):
+
+        '''Initialization'''
+
+        self.batch_size = batch_size
+        self.nums = nums # segment nums
+        self.n_classes = n_classes
+        self.shuffle = shuffle
+        self.segments = segments
+        self.ids=ids
+        self.last_scales = None
+        self.scale_method = scale_method
+        self.pipeline = pipeline
+        assert labels is not None
+        self.labels = labels
+        self.on_epoch_end()
 
     def __getitem__(self, index):
 
@@ -182,10 +186,52 @@ class SemanticsGenerator(BaseGenerator):
         nums_temp=self.nums[indexes] # to change
 
         # Generate data
-        X = self.__data_generation(nums_temp)
+        X, y = self.__data_generation(nums_temp)
+        self.last_scales = np.array(self.last_scales)
+        self.last_scales = self.last_scales.reshape(self.last_scales.shape[0], 1, 3)
+        X = X.reshape(X.shape[0],X.shape[1],X.shape[2],X.shape[3],1)
+        return [X, self.last_scales], y
 
-        # return X.reshape(X.shape[0],X.shape[1],X.shape[2],X.shape[3],1), y, self.last_scales
-        return X, self.last_scales
+    def __data_generation(self, nums_temp):
+
+        '''Generates data containing batch_size samples'''
+
+
+        # Initialization
+        assert type(self.segments) == np.ndarray
+        X = self.segments[nums_temp]
+        self._get_last_scales(X)
+        y = self.labels[nums_temp]
+
+        # Generate data
+        X = self.pipeline.fit_transform(X)
+
+        # output batch with onehot labels
+        return X, tf.keras.utils.to_categorical(y, num_classes=self.n_classes)
+
+
+class EncoderSemanticsGenerator(SemanticsGenerator):
+
+    '''Generator for model with encode decode layers and classification layers'''
+
+    def __getitem__(self, index):
+
+        '''Generate one batch of data'''
+
+        # Generate indexes of the batch
+        indexes = self.indexes[index*self.batch_size : (index+1)*self.batch_size]
+
+        # Find list of IDs
+        nums_temp=self.nums[indexes] # to change
+
+        # Generate data
+        X, y = self.__data_generation(nums_temp)
+        self.last_scales = np.array(self.last_scales)
+        self.last_scales = self.last_scales.reshape(self.last_scales.shape[0], 1, 3)
+
+        X = X.reshape(X.shape[0],X.shape[1],X.shape[2],X.shape[3], 1)
+        #print(X.shape)
+        return [X, self.last_scales], [X, y] # todo mb change later
 
     def __data_generation(self, nums_temp):
 
@@ -195,89 +241,13 @@ class SemanticsGenerator(BaseGenerator):
         assert type(self.segments) == np.ndarray
         X = self.segments[nums_temp]
         self._get_last_scales(X)
-        y = self.ids[nums_temp]
+
+        y = self.labels[nums_temp]
+        y = tf.keras.utils.to_categorical(y, num_classes=self.n_classes)
+        y = y.reshape(y.shape[0], 1, self.n_classes)
 
         # Generate data
         X = self.pipeline.fit_transform(X)
 
         # output batch with onehot labels
-        return X
-
-
-
-def get_roc_pairs(
-    segments,
-    ids,
-    USE_LAST_SAMPLE_ONLY=False,
-    ALWAYS_AGAINST_LAST=False,
-    MIN_DISTANCE_NEGATIVES=20.0,
-):
-    pair_ids = []
-    pair_labels = []
-
-    # calculate centroids
-    centroids = [np.mean(segment, 0) for segment in segments]
-
-    # positive samples
-    for _id in np.unique(ids):
-        class_ids = np.where(ids == _id)[0]
-
-        n_ids = class_ids.size
-        if n_ids != 1:
-            # get halves
-            if n_ids %2 != 0:
-                class_ids = class_ids[1:]
-            ids_1 = class_ids[:n_ids//2]
-            ids_2 = class_ids[n_ids//2:]
-            # get pairs
-            if ALWAYS_AGAINST_LAST:
-                for id_1 in ids_1:
-                    pair_ids.append([id_1, ids_2[-1]])
-                    pair_labels.append(1)
-
-                for id_2 in ids_2:
-                    pair_ids.append([ids_1[-1], id_2])
-                    pair_labels.append(1)
-
-            else:
-                for id_1 in ids_1:
-                    for id_2 in ids_2:
-                        pair_ids.append([id_1, id_2])
-                        pair_labels.append(1)
-                        pass
-                    n_positives = len(pair_ids)
-
-    # negative samples
-    np.random.seed(54321)
-    ids = range(len(segments))
-
-    last_ids = []
-    for sequence in np.unique(duplicate_ids):
-        last_ids.append(np.where(duplicate_ids == sequence)[0][-1])
-
-    n_negatives = 0
-    while n_negatives < n_positives:
-        id_1 = np.random.sample(ids, 1)[0]
-        id_2 = np.random.sample(ids, 1)[0]
-
-        if ALWAYS_AGAINST_LAST:
-            id_2 = np.random.sample(last_ids, 1)[0]
-
-        dist = np.linalg.norm(centroids[id_1] - centroids[id_2])
-        if dist >= MIN_DISTANCE_NEGATIVES:
-            pair_ids.append([id_1, id_2])
-            pair_labels.append(0)
-            n_negatives += 1
-            pass
-
-    pair_ids = np.array(pair_ids)
-    pair_labels = np.array(pair_labels)
-
-    print("Positive pairs: %d" % n_positives)
-    print("Negative pairs: %d" % n_negatives)
-
-    return pair_ids, pair_labels
-
-
-if __name__ == '__main__':
-    pass
+        return X, y
