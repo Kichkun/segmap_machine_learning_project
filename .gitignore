@@ -1,0 +1,8 @@
+segment_encoder/.idea/*
+segment_encoder/.ipynb_checkpoints/*
+segment_encoder/core/__pycache__/*
+datasets/__pycache__/*
+lechuga/__pycache__/*
+.ipynb_checkpoints/*
+.idea/*
+
