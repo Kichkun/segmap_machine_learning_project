@@ -242,7 +242,7 @@ class EncoderSemanticsGenerator(SemanticsGenerator):
         X = self.segments[nums_temp]
         self._get_last_scales(X)
 
-        y = self.labels[nums_temp]
+        y = self.ids[nums_temp]
         y = tf.keras.utils.to_categorical(y, num_classes=self.n_classes)
         y = y.reshape(y.shape[0], 1, self.n_classes)
 
