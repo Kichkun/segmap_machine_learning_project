@@ -1,7 +1,5 @@
 from __future__ import print_function
 from tensorflow import keras
-#from tensorflow.keras import Model
-#from keras.models import load_model
 import numpy as np
 import tensorflow as tf
 from segment_encoder.core.generator import EncoderGenerator, EncoderSemanticsGenerator
@@ -27,8 +25,8 @@ models = tf.keras.models
 Model = tf.keras.models.Model
 
 model = models.load_model("./logs_keras_tb/model_data18_epochs50.h5", compile = False)
-
-encoder = Model([model.layers[0].input, model.layers[8].input], model.layers[13].output)
+encoder = Model([model.layers[0].input, model.layers[8].input], model.layers[22].output)
+print(encoder.summary())
 encoder.set_weights(model.get_weights())
 
 batch_size = 1

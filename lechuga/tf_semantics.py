@@ -8,17 +8,18 @@ import random
 from sklearn import metrics
 import sys
 import tensorflow as tf
-
+import json
+import glob
 from dataset import Dataset
 from generator import Generator, GeneratorFeatures
 from preprocessor import Preprocessor
 
-SOME_FLAG_FOR_RESULT_EVAL = True
+SOME_FLAG_FOR_RESULT_EVAL = False
 batch_size = 16
-log_path = "./tmp1/"
-n_epochs = 50
+log_path = "./semantic_loss_ours_18_4/"
+n_epochs = 256
 cnn_model_folder = "/home/anastasia/segmap_machine_learning_project-master/tmp/"
-semantics_model_folder = "/home/anastasia/segmap_machine_learning_project-master/tmp1/"
+semantics_model_folder = log_path
 use_matches = False
 data18=Dataset(folder='dataset18')
 segments, _, ids, n_ids, features, matches, labels_dict = data18.load()
@@ -83,7 +84,7 @@ with tf.Session() as sess:
 
 # define the model
 FEATURE_DIM = features.shape[1]
-N_CLASSES = 3
+N_CLASSES = 4
 tf.reset_default_graph()
 
 with tf.name_scope("InputScope") as scope:
@@ -170,7 +171,7 @@ print("Training size: ", len(labels_train), " testing size: ", len(labels_test))
 gen_train = GeneratorFeatures(features_train, labels_train, n_classes=N_CLASSES)
 gen_test = GeneratorFeatures(features_test, labels_test, n_classes=N_CLASSES)
 
-LOG_NAME = "./semantic_losses/"
+LOG_NAME = log_path
 
 with tf.Session() as sess:
     # tensorboard statistics
@@ -246,6 +247,19 @@ with tf.Session() as sess:
             if LOG_NAME:
                 test_writer.add_summary(batch_summary, summary_step)
                 summary_step = summary_step + 1
+
+                epoch_debug_file = os.path.join(log_path, "%d.json" % epoch)
+                with open(epoch_debug_file, "w") as fp:
+                    json.dump(
+                        {
+                            "epoch": str(epoch),
+                            "train_loss": str(epoch_loss / (step + 1)),
+                            "train_accuracy": str(epoch_accuracy / (step + 1) * 100),
+                            "batch_loss": str(batch_loss),
+                            "batch_accuracy": str(batch_accuracy),
+                        },
+                        fp,
+                    )
 
             epoch_loss = epoch_loss + batch_loss
             epoch_accuracy = epoch_accuracy + batch_accuracy

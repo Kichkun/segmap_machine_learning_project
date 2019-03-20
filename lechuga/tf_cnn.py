@@ -11,19 +11,19 @@ from plot_roc import get_roc_pairs, get_roc_curve
 test_size = 0.3
 #retrain = './tmp/model-326400.ckpt'
 retrain = False
-n_epochs = 255
-checkpoints = 10
+n_epochs = 100
+checkpoints = 1
 batch_size = 16
 keep_best = True
 roc = True
-log_name = "./losses/"
-cnn_model_folder = "./losses/"
+log_name = "./losses1/"
+cnn_model_folder = "./losses1/"
 base_dir = ""
-log_path = "./losses/"
-debug_path = "./losses/"
+log_path = "./losses1/"
+debug_path = "./losses1/"
 folder='./'
 #debug = False
-debug = "./losses/"
+debug = "./losses1/"
 cnn_train_folders = folder
 cnn_test_folder = folder
 semantics_train_folder = folder
@@ -303,9 +303,11 @@ def init_model(input_shape, n_classes):
     )
 
     flatten = tf.contrib.layers.flatten(inputs=conv3)
+
     flatten = tf.concat([flatten, scales], axis=1, name="flatten")
 
     # classification network
+    
     dense1 = tf.layers.dense(
         inputs=flatten,
         units=512,
@@ -313,8 +315,7 @@ def init_model(input_shape, n_classes):
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
         use_bias=True,
         name="dense1",
-    )
-
+    ) 
     bn_dense1 = tf.layers.batch_normalization(
         dense1, training=training, name="bn_dense1"
     )
@@ -325,6 +326,7 @@ def init_model(input_shape, n_classes):
 
     descriptor = tf.layers.dense(
         inputs=dropout_dense1,
+         #inputs=flatten,
         units=64,
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
         activation=tf.nn.relu,
@@ -343,6 +345,7 @@ def init_model(input_shape, n_classes):
     dropout_descriptor = tf.layers.dropout(
         bn_descriptor, rate=0.35, training=training, name="dropout_descriptor"
     )
+
 
     y_pred = tf.layers.dense(
         inputs=dropout_descriptor,

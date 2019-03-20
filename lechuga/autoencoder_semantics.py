@@ -62,10 +62,9 @@ Input, Dense, Conv3D, MaxPooling3D, UpSampling3D, Dropout, Flatten, Reshape = tf
 DATASET = 18
 DATASET_PATH = './datasets_npy/'
 LABELS_PATH = './dataset'+str(DATASET)+'/labels_database.csv'
-N_CLASSES = 3
 VOXEL_SHAPE = np.array((32, 32, 16))
 BATCH_SIZE = 16
-EPOCHS = 1
+EPOCHS = 50
 log_dir = "./logs_keras_tb"
 
 # labels_database27_3_classes
@@ -80,7 +79,7 @@ lids = total[:, 0]
 labels_dict = dict(zip(lids, labels))
 labels=np.array([labels_dict[i] for i in ids])
 # print('labels.size', labels.size)
-
+N_CLASSES = np.unique(ids).size
 # choose cars only
 cars = ids[np.where(labels==1)]
 chosen_segments = segments[np.where(labels==1)]
@@ -130,7 +129,7 @@ training_generator=EncoderSemanticsGenerator(nums=partition['train'],
 						  ids=ids,
 						  pipeline=preprocessing_pipeline,
 						  batch_size=BATCH_SIZE, # BATCH_SIZE
-						  n_classes=N_CLASSES,
+						  n_classes=n_classes,
                           labels=labels)
 
 
@@ -139,7 +138,7 @@ test_generator=EncoderSemanticsGenerator(nums=partition['test'],
 						  ids=ids,
 						  pipeline=preprocessing_pipeline,
 						  batch_size=BATCH_SIZE, # BATCH_SIZE
-						  n_classes=N_CLASSES,
+						  n_classes=n_classes,
                           labels=labels)
 
 
@@ -190,7 +189,7 @@ def reconstruction_loss(voxels, reconstructed):
     return loss_r
 
 def classification_loss(classes, classified):
-    loss_c = -tf.reduce_mean(keras.losses.binary_crossentropy(classes, classified))
+    loss_c = tf.reduce_mean(keras.losses.binary_crossentropy(classes, classified))
     return loss_c
 
 losses = {
@@ -202,7 +201,7 @@ loss_weights = {"reconstruction_output": 200, "classification_output": 1}
 autoencoder = Model(inputs=[input_voxel, scales], outputs=[reconstructed, classified])
 autoencoder.compile(optimizer='adadelta', loss=losses, loss_weights=loss_weights)
 
-e_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience = 5)
+#e_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience = 20, min_delta = 0)
 
 
 # NeuralNet ============================================================================
@@ -214,7 +213,7 @@ e_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience =
 # inputs, y = training_generator.__getitem__(index=0)
 # voxelbox_segments_batch, last_scales_batch = inputs
 
-history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=100, callbacks=[e_stopping])
+history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=EPOCHS)
 
 # Kostya check
 # history = autoencoder.fit(x=[np.zeros((1, 32, 32, 16, 1)), np.zeros((1, 1, 3))],
@@ -224,7 +223,7 @@ history_train = autoencoder.fit_generator(generator=training_generator, validati
 # history = autoencoder.fit([voxelbox_segments_batch, last_scales_batch], y, epochs=EPOCHS, batch_size=1)
 
 # autoencoder.save("./model_data27_epochs50.h5")
-autoencoder.save(log_dir+"/model_data"+str(DATASET)+"_epochs50.h5")
+autoencoder.save(log_dir+"/model_data"+str(DATASET)+"_epochs"+str(EPOCHS)+".h5")
 
 # decoded = autoencoder.predict(x=[voxelbox_segments_batch, last_scales_batch])
 	# autoencoder.layers.index(len(autoencoder.layers)-1)
