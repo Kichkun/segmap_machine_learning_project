@@ -17,13 +17,28 @@ We implemented the "[3D Segment Mapping using Data-Driven Descriptors]" work.  S
 * semantic classification 
 
 ### Datasets used: 
-1. SegMap provided dataset based on [Kitti odometry dataset] with segments extracted by their previously proposed approach[SegMatch: Segment based place recognition in 3D point clouds]. 
+1. SegMap provided dataset based on [Kitti odometry dataset] with segments extracted by their previously proposed approach [SegMatch: Segment based place recognition in 3D point clouds]. 
 The provided dataset wasn't labeled fully and correctly, we mark down all data, change the representation to *.npy for fast and convinient use and upload partly in folder "datasets". 
 2. [Beyond PASCAL: A Benchmark for 3D Object Detection in the Wild]. We had an idea to learn our model on perfect segments recieved from CAD-models, however on voxelization step it becomes clear that this dataset doesn't suit us due to very sparse results. 
 3. [SYDNEY URBAN OBJECTS DATASET]. We got this dataset on last stage of our project. It's suit us. Used for tests.
 4. Vision meets Robotics: The KITTI Dataset. We were trying to use Kitti 3D object dataset by [Vision meets Robotics: The KITTI Dataset] however we were not managed to extract valuable segments from LiDAR data. This dataset was created for other goals.
 
-## Authors
+### Expirements 
+* develop a procedure for generating training data and detail the performances of the SegMap descriptor
+for localization, reconstruction and semantics extraction.
+All experiments were performed on "Lechuga machine" provided by Mobile Robotics lab which has 3 GPU GeForce GTX 1080 Ti with compute capability: 6.1. 
+
+### Libraries 
+* Tensorflow-gpu==1.8.0 (for comparable expirements)
+* Keras (for our models)
+* sklearn (pipeline, preprocessing)
+
+### Results 
+*
+*
+*
+
+### Authors
 
 * **Anastasia Kishkun** 
 * **Alenicheva Alisa** 
