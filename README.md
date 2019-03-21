@@ -31,16 +31,17 @@ The provided dataset wasn't labeled fully and correctly, we mark down all data, 
 * **Konstantin Pakulev** 
 * **Roman Zinoviev** 
 
-### * Resources & References
-1. [3D Segment Mapping using Data-Driven Descriptors] (http://www.roboticsproceedings.org/rss14/p03.pdf)
+### Resources & References
 
-2. [Kitti odometry dataset] (http://www.cvlibs.net/datasets/kitti/eval_odometry.php)
+1. [3D Segment Mapping using Data-Driven Descriptors]: http://www.roboticsproceedings.org/rss14/p03.pdf
 
-3. [SegMatch: Segment based place recognition in 3D point clouds] (https://www.researchgate.net/publication/318693876_SegMatch_Segment_based_place_recognition_in_3D_point_clouds)
+2. [Kitti odometry dataset]: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
 
-4. [Beyond PASCAL: A Benchmark for 3D Object Detection in the Wild] (http://cvgl.stanford.edu/projects/pascal3d.html)
+3. [SegMatch: Segment based place recognition in 3D point clouds]: https://www.researchgate.net/publication/318693876_SegMatch_Segment_based_place_recognition_in_3D_point_clouds
 
-5. [SYDNEY URBAN OBJECTS DATASET] (http://www.acfr.usyd.edu.au/papers/SydneyUrbanObjectsDataset.shtml)
+4. [Beyond PASCAL: A Benchmark for 3D Object Detection in the Wild]: http://cvgl.stanford.edu/projects/pascal3d.html
 
-6. [Vision meets Robotics: The KITTI Dataset] (http://www.cvlibs.net/publications/Geiger2013IJRR.pdf)
+5. [SYDNEY URBAN OBJECTS DATASET]: http://www.acfr.usyd.edu.au/papers/SydneyUrbanObjectsDataset.shtml
+
+6. [Vision meets Robotics: The KITTI Dataset]: http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
  
