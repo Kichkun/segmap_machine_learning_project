@@ -27,6 +27,9 @@ The provided dataset wasn't labeled fully and correctly, we marked down all data
 * develop a procedure for generating training data and detail the performances of the SegMap descriptor
 for localization, reconstruction and semantics extraction.
 All experiments were performed on "Lechuga machine" provided by Mobile Robotics lab which has 3 GPU GeForce GTX 1080 Ti with compute capability: 6.1. 
+Segmap provide open code however it isn't possible to compile due to many unresolved dependencies(Ububntu 14 need with Tensorflow comiled by hands, ROS, catkin etc). We were need comparable results, that's why we took some parts of their code and managed to compile it after many iterations without dependecies. Autoencoder and sematic models on TF were recieved in this way. We also provide some experiments with their model and implemented our own on Keras. 
+We trained zoo of our model on our datasets, Segmap and Sydney. The general scheme of our experiments is provided below. 
+ ![Experiments](https://github.com/Kichkun/segmap_machine_learning_project/blob/master/plots/table%20(1).png)
 
 ### Libraries 
 * Tensorflow-gpu==1.8.0 (for comparable expirements)
