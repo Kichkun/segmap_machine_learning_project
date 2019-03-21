@@ -42,8 +42,8 @@ We trained zoo of our model on our datasets, Segmap and Sydney. The general sche
 ### Results 
 #### Reconstruction results
 
- ![Input](https://github.com/Kichkun/segmap_machine_learning_project/blob/master/plots/input.mp4)
- ![Output](https://github.com/Kichkun/segmap_machine_learning_project/blob/master/plots/output.mp4)
+ ![Input](https://github.com/Kichkun/segmap_machine_learning_project/blob/master/plots/input.gif)
+ ![Output](https://github.com/Kichkun/segmap_machine_learning_project/blob/master/plots/output.gif)
 
 #### COmparison of Keras and Tensorflow autoencoder implementation
 
