@@ -29,6 +29,7 @@ folder='./dataset18'
 batch_size = 16
 test_size = 0.3
 
+from_file = models.load_model("./logs_keras_tb/model.h5", compile= False)
 
 def load_segments(folder=folder, filename="segments_database.csv"):
     # container
@@ -974,7 +975,7 @@ class Generator(tf.keras.utils.Sequence):
 
         return [batch_segments, scales], [batch_segments, batch_classes]
 
-EPOCHS = 50
+EPOCHS = 10
 
 segments = []
 classes = np.array([], dtype=np.int)
@@ -1068,41 +1069,42 @@ test_generator = Generator(
 
 input_voxel = Input(shape=(32, 32, 16, 1))
 scales = Input(shape=(1, 3))
-
+if from_file:
+    from_file.set_weights(from_file.get_weights())
+else:
 # Convolution
-x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(input_voxel)
-x = MaxPooling3D((2, 2, 2), padding='same')(x)
-x = Conv3D(64, (3, 3 ,3), activation='relu', padding='same')(x)
-x = MaxPooling3D((2, 2, 2), padding='same')(x)
-x = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(x)
+    x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(input_voxel)
+    x = MaxPooling3D((2, 2, 2), padding='same')(x)
+    x = Conv3D(64, (3, 3 ,3), activation='relu', padding='same')(x)
+    x = MaxPooling3D((2, 2, 2), padding='same')(x)
+    x = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(x)
 
-x = Flatten()(x)
-x = Reshape((1, 16384))(x)
-x = Concatenate()([x, scales])
+    x = Flatten()(x)
+    x = Reshape((1, 16384))(x)
+    x = Concatenate()([x, scales])
 
 
-x = Dense(512)(x)
-x = BatchNormalization()(x)
-x = Dropout(0.5)(x)
+    x = Dense(512)(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
 
-# Descriptor
-description = Dense(64)(x)
+    # Descriptor
+    description = Dense(64)(x)
 
-# Deconvolution
-x = Dense(8192)(description)
-x = Reshape((8, 8, 4, 32))(x)
-x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
-x = UpSampling3D((2, 2, 2))(x)
-x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
-x = UpSampling3D((2, 2, 2))(x)
-reconstructed = Conv3D(1, (3, 3, 3), activation='sigmoid', padding='same', name='reconstruction_output')(x)
+    # Deconvolution
+    x = Dense(8192)(description)
+    x = Reshape((8, 8, 4, 32))(x)
+    x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
+    x = UpSampling3D((2, 2, 2))(x)
+    x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
+    x = UpSampling3D((2, 2, 2))(x)
+    reconstructed = Conv3D(1, (3, 3, 3), activation='sigmoid', padding='same', name='reconstruction_output')(x)
 
-#Classificator
-y = BatchNormalization()(description)
-y = Dropout(0.5)(y)
-y = Dense(n_classes)(y)
-classified = Activation('softmax', name='classification_output')(y)
-print(classified.shape)
+    #Classificator
+    y = BatchNormalization()(description)
+    y = Dropout(0.5)(y)
+    y = Dense(n_classes)(y)
+    classified = Activation('softmax', name='classification_output')(y)
 
 def reconstruction_loss(voxels, reconstructed):
     FN_TO_FP_WEIGHT = 0.9
@@ -1119,10 +1121,17 @@ losses = {
 	"classification_output": classification_loss
 }
 loss_weights = {"reconstruction_output": 200, "classification_output": 1}
+if from_file:
+    print(from_file.summary())
+    encoder  = Model(inputs = [from_file.layers[0].input, from_file.layers[8].input], outputs = [from_file.layers[23].output, from_file.layers[24].output])
+    encoder.set_weights(from_file.get_weights())
+    encoder.compile(optimizer='adadelta', loss=losses, loss_weights=loss_weights)
+    history_train = encoder.fit_generator(generator=training_generator, validation_data=test_generator,
+                                              epochs=EPOCHS)
+else:
+    autoencoder = Model(inputs=[input_voxel, scales], outputs=[reconstructed, classified])
+    autoencoder.compile(optimizer='adadelta', loss=losses, loss_weights=loss_weights)
+    history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=EPOCHS)
 
-autoencoder = Model(inputs=[input_voxel, scales], outputs=[reconstructed, classified])
-autoencoder.compile(optimizer='adadelta', loss=losses, loss_weights=loss_weights)
-history_train = autoencoder.fit_generator(generator=training_generator, validation_data=test_generator, epochs=EPOCHS)
-
-autoencoder.save("./logs_keras_tb/model.h5")
+    autoencoder.save("./logs_keras_tb/model_from_save.h5")
 pd.DataFrame(history_train.history).to_csv("./logs_keras_tb/history_train.csv")
